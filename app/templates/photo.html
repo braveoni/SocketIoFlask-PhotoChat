@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PhotoChat: {{ room }}</title>
+    <script type="text/javascript" src="//code.jquery.com/jquery-1.4.2.min.js"></script>
+    <script type="text/javascript" src="//cdn.socket.io/4.4.1/socket.io.min.js"></script>
+    <script type="text/javascript" charset="utf-8">
+        let socket;
+
+        $(document).ready(function () {
+            socket = io.connect('http://' + document.domain + ':' + location.port + '/chat');
+
+            socket.on('connect', function() {  
+                socket.emit('joined', {});
+            });
+            
+            socket.on('status', function(data) {
+                $('#chat').val($('#chat').val() + '<' + data.msg + '>\n');
+                $('#chat').scrollTop($('#chat')[0].scrollHeight);
+            });
+
+            socket.on("image", function(data) {
+                var messageContainer = document.getElementById('message-container');
+
+                var arrayBufferView = new Uint8Array(data['image']);
+                var blob = new Blob( [ arrayBufferView ], { type: "image/jpeg" } );
+                var img_url = URL.createObjectURL(blob);
+                var img = document.createElement("img");
+                img.src = img_url;
+                img.style.width = '50%';
+
+                messageContainer.appendChild(img);
+            });
+        });
+
+        function upload() {
+            var file = document.getElementById('files').files[0];
+            var fileReader = new FileReader();
+            fileReader.readAsArrayBuffer(file);
+
+            fileReader.onload = function(e) {
+                var arrayBuffer = fileReader.result;
+
+                socket.emit('image-upload', { 
+                    name: file.name, 
+                    type: file.type, 
+                    size: file.size, 
+                    binary: arrayBuffer 
+                });
+            };
+        };
+
+        function leave_room() {
+            socket.emit('left', {}, function() {
+                socket.disconnect();
+                window.location.href = "{{ url_for('main.index') }}";
+            });
+        };
+    </script>
+</head>
+
+<style>
+    main {
+        display: flex;
+        flex-direction: row;
+    }
+</style>
+
+<body>
+    <div class="main">
+        <div>
+            <form action="">
+                <input type="file" id="files" accept="image/*" />
+                <button type="button" id="btn" onclick="upload();"> Send </button>
+            </form>
+            <div id="message-container"></div>
+            <a href="#" onclick="leave_room();">Leave this room</a>
+        </div>
+        <div>
+            <textarea id="chat" cols="80" rows="20" disabled="true"></textarea><br><br>
+        </div>
+    </div>
+</body>
+</html>
